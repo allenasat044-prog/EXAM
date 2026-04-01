@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OS Lab Record</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f5f5f5}
+.app{display:flex;height:100vh;overflow:hidden}
+.sidebar{width:230px;min-width:230px;background:#1e1e2e;overflow-y:auto;padding:10px 0}
+.sidebar-title{font-size:10px;font-weight:700;color:#888;padding:8px 14px 12px;text-transform:uppercase;letter-spacing:0.1em}
+.exp-group{margin-bottom:4px}
+.exp-header{font-size:12px;font-weight:600;color:#ccc;padding:7px 14px;cursor:pointer;border-left:3px solid transparent}
+.exp-header:hover{background:#2a2a3e;color:#fff}
+.exp-header.active{border-left-color:#7c6af7;color:#7c6af7;background:#2a2a3e}
+.sub-item{font-size:11px;color:#888;padding:5px 14px 5px 28px;cursor:pointer;border-left:3px solid transparent}
+.sub-item:hover{background:#2a2a3e;color:#ccc}
+.sub-item.active{border-left-color:#4ec9a0;color:#4ec9a0;background:#252535}
+.main{flex:1;overflow-y:auto;padding:24px 28px;background:#f5f5f5}
+.page-title{font-size:18px;font-weight:700;color:#222;margin-bottom:2px}
+.page-sub{font-size:12px;color:#888;margin-bottom:18px}
+.tabs{display:flex;gap:8px;margin-bottom:16px}
+.tab{font-size:12px;padding:6px 16px;border-radius:6px;border:1px solid #ddd;cursor:pointer;color:#666;background:#fff}
+.tab.active{background:#7c6af7;color:#fff;border-color:#7c6af7}
+.hidden{display:none}
+.card{background:#fff;border:1px solid #e0e0e0;border-radius:8px;margin-bottom:16px;overflow:hidden}
+.card-header{padding:10px 16px;background:#f9f9f9;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;gap:10px}
+.badge-algo{background:#ede9fe;color:#5b21b6;font-size:11px;font-weight:600;padding:3px 10px;border-radius:4px}
+.badge-code{background:#d1fae5;color:#065f46;font-size:11px;font-weight:600;padding:3px 10px;border-radius:4px}
+.copy-btn{margin-left:auto;font-size:11px;padding:4px 12px;border-radius:5px;border:1px solid #ccc;cursor:pointer;background:#fff;color:#444}
+.copy-btn:hover{background:#f0f0f0}
+.copy-btn.copied{background:#4ec9a0;color:#fff;border-color:#4ec9a0}
+.card-body{padding:16px}
+.algo-list{list-style:none;counter-reset:step}
+.algo-list li{counter-increment:step;display:flex;gap:12px;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#333;line-height:1.5}
+.algo-list li:last-child{border-bottom:none}
+.step-num{width:22px;height:22px;min-width:22px;border-radius:50%;background:#ede9fe;color:#5b21b6;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px}
+pre{font-family:'Courier New',Courier,monospace;font-size:12px;line-height:1.7;color:#1a1a1a;white-space:pre;overflow-x:auto;background:#1e1e2e;padding:16px;border-radius:6px;color:#d4d4d4;user-select:text}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="sidebar">
+  <div class="sidebar-title">OS Lab Record</div>
+  <div id="nav"></div>
+</div>
+<div class="main" id="main"></div>
+</div>
+
+<script>
+const data = {
+exp1:{title:"Exp 1: System Calls",subs:{
+  pf:{title:"getpid / getppid / fork",
+    algo:[
+      "Every process has a unique PID. getpid() returns current process ID, getppid() returns parent's PID. Both from <unistd.h>.",
+      "fork() duplicates the calling process. Returns 0 in child, child_pid in parent, -1 on failure.",
+      "Check return value: if(pid==0) → child block; else → parent block. Both share code but have different PIDs.",
+      "In child: print getpid() and getppid(). In parent: print getpid() and the pid returned by fork()."
+    ],
+    code:`#include<stdio.h>
+#include<unistd.h>
+
+int main(){
+    pid_t pid;
+    printf("Before fork: PID = %d\n", getpid());
+
+    pid = fork();  // create child process
+
+    if(pid < 0){
+        perror("fork failed");
+        return 1;
+    }
+    if(pid == 0){
+        // Child process block
+        printf("[CHILD]  My PID  = %d\n", getpid());
+        printf("[CHILD]  My PPID = %d\n", getppid());
+    } else {
+        // Parent process block
+        printf("[PARENT] My PID       = %d\n", getpid());
+        printf("[PARENT] Child's PID  = %d\n", pid);
+    }
+    return 0;
+}
+// Compile: gcc pid_fork.c -o pid_fork
+// Run:     ./pid_fork`},
+
+  dir:{title:"opendir / readdir / closedir",
+    algo:[
+      "Include <dirent.h> for directory operations. opendir(path) opens a directory and returns a DIR* pointer. Returns NULL if invalid.",
+      "DIR *d = opendir(\".\") opens current directory. Use \".\" for current, \"..\" for parent, or absolute path.",
+      "readdir(d) returns struct dirent* with entry name in d_name field. Returns NULL at end. Loop until NULL.",
+      "Always call closedir(d) after reading to release the file descriptor. Analogous to fclose() for files."
+    ],
+    code:`#include<stdio.h>
+#include<dirent.h>
+
+int main(){
+    char path[200];
+    printf("Enter directory path (press Enter for current dir '.'): ");
+    scanf("%s", path);
+
+    DIR *d = opendir(path);
+    if(!d){
+        perror("opendir failed");
+        return 1;
+    }
+
+    struct dirent *entry;
+    int count = 0;
+    printf("\nListing: %s\n", path);
+    printf("----------------------------\n");
+    while((entry = readdir(d)) != NULL){
+        printf("  %s\n", entry->d_name);
+        count++;
+    }
+    printf("----------------------------\n");
+    printf("Total entries: %d\n", count);
+
+    closedir(d);  // always close!
+    return 0;
+}
+// Compile: gcc dir.c -o dir
+// Run:     ./dir`},
+
+  rw:{title:"open / read / write / close",
+    algo:[
+      "open() returns a file descriptor (integer). 0=stdin, 1=stdout, 2=stderr. Custom files get fd >= 3. Requires <fcntl.h>.",
+      "open(filename, O_RDONLY) opens for reading. O_WRONLY for write, O_RDWR for both. Returns -1 on failure.",
+      "read(fd, buf, n) reads up to n bytes into buf. Returns bytes read, 0 at EOF, -1 on error. Needs <unistd.h>.",
+      "write(fd, buf, n) writes n bytes from buf to fd. Use STDOUT_FILENO (=1) to write to screen.",
+      "close(fd) releases the file descriptor. Always close after use to avoid descriptor exhaustion."
+    ],
+    code:`#include<stdio.h>
+#include<fcntl.h>
+#include<unistd.h>
+
+int main(){
+    char filename[200];
+    printf("Enter filename to read: ");
+    scanf("%s", filename);
+
+    int fd = open(filename, O_RDONLY);
+    if(fd < 0){
+        perror("open failed");
+        return 1;
+    }
+
+    char buf[256];
+    int bytes_read;
+    printf("\n--- File Contents ---\n");
+    while((bytes_read = read(fd, buf, sizeof(buf))) > 0){
+        write(STDOUT_FILENO, buf, bytes_read);
+    }
+    printf("\n--- End of File ---\n");
+
+    close(fd);  // always close file descriptor
+    return 0;
+}
+// Compile: gcc fileio.c -o fileio
+// Run:     ./fileio`}
+}},
+
+exp2:{title:"Exp 2: CPU Scheduling",subs:{
+  fcfs:{title:"FCFS",
+    algo:[
+      "FCFS schedules processes in arrival order. Non-preemptive — once started, runs to completion. Suffers from Convoy Effect.",
+      "Sort by Arrival Time. For each process: t = max(t, AT[i]) + BT[i]. The max() handles idle CPU gaps.",
+      "CT = t after execution. TAT = CT - AT. WT = TAT - BT.",
+      "Avg WT = sum(WT) / n. Avg TAT = sum(TAT) / n."
+    ],
+    code:`#include<stdio.h>
+
+int main(){
+    int n;
+    printf("Enter number of processes: ");
+    scanf("%d", &n);
+
+    int at[n], bt[n], ct[n], tat[n], wt[n];
+    for(int i=0; i<n; i++){
+        printf("Process P%d -> Arrival Time : ", i+1); scanf("%d",&at[i]);
+        printf("Process P%d -> Burst Time   : ", i+1); scanf("%d",&bt[i]);
+    }
+
+    int t = 0;
+    for(int i=0; i<n; i++){
+        if(t < at[i]) t = at[i];  // CPU idle until process arrives
+        t += bt[i];
+        ct[i]  = t;
+        tat[i] = ct[i] - at[i];
+        wt[i]  = tat[i] - bt[i];
+    }
+
+    printf("\nP\tAT\tBT\tCT\tTAT\tWT\n");
+    float sw=0, st=0;
+    for(int i=0; i<n; i++){
+        printf("P%d\t%d\t%d\t%d\t%d\t%d\n",i+1,at[i],bt[i],ct[i],tat[i],wt[i]);
+        sw += wt[i]; st += tat[i];
+    }
+    printf("\nAvg Waiting Time    = %.2f\n", sw/n);
+    printf("Avg Turnaround Time = %.2f\n", st/n);
+    return 0;
+}`},
+
+  rr:{title:"Round Robin",
+    algo:[
+      "Each process gets a fixed time quantum q. After q units, if not done, preempted and re-queued. Fair but has context switch overhead.",
+      "Maintain rem[] = remaining burst time. A process joins when AT[i] <= current_time.",
+      "If rem[i] <= q: execute fully, CT[i] = t + rem[i]. If rem[i] > q: rem[i] -= q, t += q, re-queue.",
+      "If no process ready at time t, increment t by 1 (idle CPU).",
+      "TAT = CT - AT. WT = TAT - BT. Smaller quantum = better response but more context switches."
+    ],
+    code:`#include<stdio.h>
+
+int main(){
+    int n, q;
+    printf("Enter number of processes : "); scanf("%d",&n);
+    printf("Enter time quantum        : "); scanf("%d",&q);
+
+    int at[n], bt[n], rem[n], ct[n];
+    for(int i=0;i<n;i++){
+        printf("P%d -> AT BT: ", i+1); scanf("%d%d",&at[i],&bt[i]);
+        rem[i] = bt[i];
+    }
+
+    int t=0, done=0;
+    while(done < n){
+        int found = 0;
+        for(int i=0; i<n; i++){
+            if(rem[i]>0 && at[i]<=t){
+                found = 1;
+                if(rem[i] <= q){
+                    t += rem[i]; rem[i]=0; ct[i]=t; done++;
+                } else {
+                    rem[i] -= q; t += q;
+                }
+            }
+        }
+        if(!found) t++;  // CPU idle
+    }
+
+    printf("\nP\tAT\tBT\tCT\tTAT\tWT\n");
+    float sw=0, st=0;
+    for(int i=0;i<n;i++){
+        int tat=ct[i]-at[i], wt=tat-bt[i];
+        printf("P%d\t%d\t%d\t%d\t%d\t%d\n",i+1,at[i],bt[i],ct[i],tat,wt);
+        sw+=wt; st+=tat;
+    }
+    printf("\nAvg WT=%.2f  Avg TAT=%.2f\n",sw/n,st/n);
+    return 0;
+}`},
+
+  sjf:{title:"SJF Non-Preemptive",
+    algo:[
+      "Selects process with smallest Burst Time among all arrived and unfinished processes. Non-preemptive. Minimizes avg waiting time.",
+      "Scan all: if !done[i] && AT[i]<=t && BT[i] < min → select it. Break ties with lower index (FCFS).",
+      "If no process ready at time t, increment t and continue (idle CPU handling).",
+      "Execute: t += bt[sel], ct[sel] = t, done[sel] = 1. TAT = CT - AT. WT = TAT - BT.",
+      "Suffers from starvation — long processes may wait forever. Solution: Aging (increase priority over time)."
+    ],
+    code:`#include<stdio.h>
+
+int main(){
+    int n;
+    printf("Enter number of processes: "); scanf("%d",&n);
+
+    int at[n], bt[n], done[n], ct[n];
+    for(int i=0;i<n;i++){
+        printf("P%d -> AT BT: ",i+1); scanf("%d%d",&at[i],&bt[i]);
+        done[i]=0;
+    }
+
+    int t=0, fin=0;
+    while(fin < n){
+        int sel=-1, mn=9999;
+        for(int i=0;i<n;i++)
+            if(!done[i] && at[i]<=t && bt[i]<mn){mn=bt[i]; sel=i;}
+        if(sel==-1){ t++; continue; }
+        t += bt[sel]; ct[sel]=t; done[sel]=1; fin++;
+    }
+
+    printf("\nP\tAT\tBT\tCT\tTAT\tWT\n");
+    float sw=0, st=0;
+    for(int i=0;i<n;i++){
+        int tat=ct[i]-at[i], wt=tat-bt[i];
+        printf("P%d\t%d\t%d\t%d\t%d\t%d\n",i+1,at[i],bt[i],ct[i],tat,wt);
+        sw+=wt; st+=tat;
+    }
+    printf("\nAvg WT=%.2f  Avg TAT=%.2f\n",sw/n,st/n);
+    return 0;
+}`},
+
+  pri:{title:"Priority Scheduling",
+    algo:[
+      "Each process has a priority number. Lower number = higher priority. CPU picks highest priority ready process. Non-preemptive here.",
+      "Scan: pick !done[i] && AT[i]<=t && PR[i] < min_priority. Tiebreaker: FCFS (lower index).",
+      "Execute: t += bt[sel], ct[sel] = t, done[sel] = 1. Idle CPU: increment t if no process ready.",
+      "Starvation: low-priority may wait forever. Solution: Aging — increase priority of waiting processes.",
+      "TAT = CT - AT. WT = TAT - BT. pr=1 is highest priority in this implementation."
+    ],
+    code:`#include<stdio.h>
+
+int main(){
+    int n;
+    printf("Enter number of processes: "); scanf("%d",&n);
+
+    int at[n],bt[n],pr[n],done[n],ct[n];
+    for(int i=0;i<n;i++){
+        printf("P%d -> Arrival Time         : ",i+1); scanf("%d",&at[i]);
+        printf("P%d -> Burst Time           : ",i+1); scanf("%d",&bt[i]);
+        printf("P%d -> Priority (lower=high): ",i+1); scanf("%d",&pr[i]);
+        done[i]=0;
+    }
+
+    int t=0, fin=0;
+    while(fin < n){
+        int sel=-1, mp=9999;
+        for(int i=0;i<n;i++)
+            if(!done[i] && at[i]<=t && pr[i]<mp){mp=pr[i]; sel=i;}
+        if(sel==-1){ t++; continue; }
+        t += bt[sel]; ct[sel]=t; done[sel]=1; fin++;
+    }
+
+    printf("\nP\tAT\tBT\tPR\tCT\tTAT\tWT\n");
+    float sw=0,st=0;
+    for(int i=0;i<n;i++){
+        int tat=ct[i]-at[i], wt=tat-bt[i];
+        printf("P%d\t%d\t%d\t%d\t%d\t%d\t%d\n",i+1,at[i],bt[i],pr[i],ct[i],tat,wt);
+        sw+=wt; st+=tat;
+    }
+    printf("\nAvg WT=%.2f  Avg TAT=%.2f\n",sw/n,st/n);
+    return 0;
+}`}
+}},
+
+exp3:{title:"Exp 3: Classical Problems",subs:{
+  bb:{title:"Bounded Buffer (Producer-Consumer)",
+    algo:[
+      "Producer adds items to shared buffer (size N). Consumer removes them. Problem: no overflow, no underflow, no simultaneous access.",
+      "Three semaphores: empty=N (producer waits when 0), full=0 (consumer waits when 0), mutex=1 (mutual exclusion).",
+      "Producer: wait(empty) → wait(mutex) → add item → signal(mutex) → signal(full).",
+      "Consumer: wait(full) → wait(mutex) → remove item → signal(mutex) → signal(empty).",
+      "Circular buffer: in index for produce, out index for consume. Both wrap with modulo N."
+    ],
+    code:`#include<stdio.h>
+#include<pthread.h>
+#include<semaphore.h>
+#define N 5
+
+int buf[N], in=0, out=0;
+sem_t empty, full, mutex;
+
+void* producer(void* a){
+    for(int i=1; i<=10; i++){
+        sem_wait(&empty);
+        sem_wait(&mutex);
+        buf[in] = i;
+        printf("[Producer] item=%d -> slot %d\n", i, in);
+        in = (in+1) % N;
+        sem_post(&mutex);
+        sem_post(&full);
+    }
+    return NULL;
+}
+
+void* consumer(void* a){
+    for(int i=1; i<=10; i++){
+        sem_wait(&full);
+        sem_wait(&mutex);
+        int item = buf[out];
+        printf("[Consumer] item=%d <- slot %d\n", item, out);
+        out = (out+1) % N;
+        sem_post(&mutex);
+        sem_post(&empty);
+    }
+    return NULL;
+}
+
+int main(){
+    printf("Bounded Buffer Problem (N=%d)\n\n", N);
+    sem_init(&empty, 0, N);
+    sem_init(&full,  0, 0);
+    sem_init(&mutex, 0, 1);
+    pthread_t p, c;
+    pthread_create(&p, NULL, producer, NULL);
+    pthread_create(&c, NULL, consumer, NULL);
+    pthread_join(p, NULL);
+    pthread_join(c, NULL);
+    printf("\nAll items produced and consumed.\n");
+    return 0;
+}
+// Compile: gcc bounded.c -lpthread -o bounded`},
+
+  rw:{title:"Reader-Writer Problem",
+    algo:[
+      "Multiple readers can read simultaneously. A writer needs exclusive access — no reader or writer during write.",
+      "rw_mutex=1 controls writer's exclusive access. mutex=1 protects read_count variable. read_count=0 tracks active readers.",
+      "Reader entry: lock(mutex) → read_count++ → if first reader, lock(rw_mutex) → unlock(mutex) → READ.",
+      "Reader exit: lock(mutex) → read_count-- → if last reader, unlock(rw_mutex) → unlock(mutex).",
+      "Writer: wait(rw_mutex) → WRITE → signal(rw_mutex). Writers can starve if readers keep coming."
+    ],
+    code:`#include<stdio.h>
+#include<pthread.h>
+#include<semaphore.h>
+
+sem_t rw_mutex, mutex;
+int read_count = 0;
+
+void* reader(void* a){
+    int id = *(int*)a;
+    sem_wait(&mutex);
+    read_count++;
+    if(read_count == 1) sem_wait(&rw_mutex);
+    sem_post(&mutex);
+
+    printf("[Reader %d] is reading...\n", id);
+
+    sem_wait(&mutex);
+    read_count--;
+    if(read_count == 0) sem_post(&rw_mutex);
+    sem_post(&mutex);
+    return NULL;
+}
+
+void* writer(void* a){
+    int id = *(int*)a;
+    sem_wait(&rw_mutex);
+    printf("[Writer %d] is writing...\n", id);
+    sem_post(&rw_mutex);
+    return NULL;
+}
+
+int main(){
+    printf("Reader-Writer Problem\n\n");
+    sem_init(&rw_mutex, 0, 1);
+    sem_init(&mutex,    0, 1);
+    pthread_t r[3], w[2];
+    int rid[]={1,2,3}, wid[]={1,2};
+    for(int i=0;i<3;i++) pthread_create(&r[i],NULL,reader,&rid[i]);
+    for(int i=0;i<2;i++) pthread_create(&w[i],NULL,writer,&wid[i]);
+    for(int i=0;i<3;i++) pthread_join(r[i],NULL);
+    for(int i=0;i<2;i++) pthread_join(w[i],NULL);
+    return 0;
+}
+// Compile: gcc rw.c -lpthread -o rw`},
+
+  dp:{title:"Dining Philosophers",
+    algo:[
+      "5 philosophers need 2 forks (left+right) to eat. Only 5 forks exist. Problems: deadlock and starvation.",
+      "Naive approach causes deadlock: all pick left fork simultaneously, all wait for right forever.",
+      "Fix: Asymmetric ordering. Even philosophers pick left first, odd pick right first. Breaks circular wait.",
+      "Each fork = semaphore initialized to 1. sem_wait = pick up fork. sem_post = put down fork.",
+      "Lifecycle: think → pick forks → eat → put forks → repeat."
+    ],
+    code:`#include<stdio.h>
+#include<pthread.h>
+#include<semaphore.h>
+#include<unistd.h>
+#define N 5
+
+sem_t fork_sem[N];
+
+void* philosopher(void* a){
+    int i = *(int*)a;
+    int left  = i;
+    int right = (i+1) % N;
+
+    printf("Philosopher %d is thinking...\n", i);
+    sleep(1);
+
+    if(i % 2 == 0){
+        sem_wait(&fork_sem[left]);
+        sem_wait(&fork_sem[right]);
+    } else {
+        sem_wait(&fork_sem[right]);
+        sem_wait(&fork_sem[left]);
+    }
+
+    printf("Philosopher %d is EATING\n", i);
+    sleep(1);
+
+    sem_post(&fork_sem[left]);
+    sem_post(&fork_sem[right]);
+    printf("Philosopher %d finished eating\n", i);
+    return NULL;
+}
+
+int main(){
+    printf("Dining Philosophers (Deadlock-Free via Asymmetric)\n\n");
+    for(int i=0; i<N; i++) sem_init(&fork_sem[i], 0, 1);
+    pthread_t t[N]; int id[N];
+    for(int i=0;i<N;i++){id[i]=i; pthread_create(&t[i],NULL,philosopher,&id[i]);}
+    for(int i=0;i<N;i++) pthread_join(t[i],NULL);
+    printf("\nAll philosophers done.\n");
+    return 0;
+}
+// Compile: gcc dining.c -lpthread -o dining`},
+
+  dlf:{title:"Deadlock-Free (Tanenbaum)",
+    algo:[
+      "States: THINKING=0, HUNGRY=1, EATING=2. Stored in state[N] array.",
+      "test(i): if state[i]==HUNGRY && left!=EATING && right!=EATING → set EATING → signal s[i].",
+      "pickup(i): lock → state[i]=HUNGRY → test(i) → unlock → sem_wait(s[i]). Blocks if can't eat.",
+      "putdown(i): lock → state[i]=THINKING → test(LEFT) → test(RIGHT) → unlock. Wakes waiting neighbors.",
+      "No deadlock: eating checked atomically. No starvation: neighbors explicitly woken on putdown."
+    ],
+    code:`#include<stdio.h>
+#include<pthread.h>
+#include<semaphore.h>
+#define N 5
+#define THINKING 0
+#define HUNGRY   1
+#define EATING   2
+#define L(i) ((i+N-1)%N)
+#define R(i) ((i+1)%N)
+
+int state[N];
+sem_t s[N];
+sem_t mutex;
+
+void test(int i){
+    if(state[i]==HUNGRY && state[L(i)]!=EATING && state[R(i)]!=EATING){
+        state[i] = EATING;
+        printf("Philosopher %d: EATING now (safe)\n", i);
+        sem_post(&s[i]);
+    }
+}
+
+void pickup(int i){
+    sem_wait(&mutex);
+    state[i] = HUNGRY;
+    printf("Philosopher %d: HUNGRY, waiting...\n", i);
+    test(i);
+    sem_post(&mutex);
+    sem_wait(&s[i]);
+}
+
+void putdown(int i){
+    sem_wait(&mutex);
+    state[i] = THINKING;
+    printf("Philosopher %d: done eating, THINKING\n", i);
+    test(L(i));
+    test(R(i));
+    sem_post(&mutex);
+}
+
+void* philosopher(void* a){
+    int i = *(int*)a;
+    pickup(i);
+    putdown(i);
+    return NULL;
+}
+
+int main(){
+    printf("Tanenbaum Deadlock-Free Dining Philosophers\n\n");
+    sem_init(&mutex, 0, 1);
+    for(int i=0;i<N;i++){state[i]=THINKING; sem_init(&s[i],0,0);}
+    pthread_t t[N]; int id[N];
+    for(int i=0;i<N;i++){id[i]=i; pthread_create(&t[i],NULL,philosopher,&id[i]);}
+    for(int i=0;i<N;i++) pthread_join(t[i],NULL);
+    return 0;
+}
+// Compile: gcc tanenbaum.c -lpthread -o tanenbaum`}
+}},
+
+exp4:{title:"Exp 4: Sync Problems",subs:{
+  tk:{title:"Ticket Booking — Mutex",
+    algo:[
+      "Race condition: two users check seat availability simultaneously, both see it free, both book it — double booking.",
+      "Critical section: check if seat available → assign seat. Must be atomic.",
+      "pthread_mutex_lock(&lock) — only one thread enters at a time. All others block.",
+      "Inside lock: scan seats[], book first free seat. Then pthread_mutex_unlock(&lock).",
+      "Race condition needs: shared data + concurrent access + at least one write + no sync. Mutex prevents this."
+    ],
+    code:`#include<stdio.h>
+#include<pthread.h>
+#define SEATS 5
+
+int seats[SEATS] = {0};
+pthread_mutex_t lock;
+
+void* book_seat(void* a){
+    int uid = *(int*)a;
+    pthread_mutex_lock(&lock);
+    int booked = 0;
+    for(int i=0; i<SEATS; i++){
+        if(seats[i] == 0){
+            seats[i] = uid;
+            printf("[User %d] Booked Seat %d successfully\n", uid, i+1);
+            booked = 1;
+            break;
+        }
+    }
+    if(!booked)
+        printf("[User %d] Sorry! No seats available.\n", uid);
+    pthread_mutex_unlock(&lock);
+    return NULL;
+}
+
+int main(){
+    int n;
+    printf("Enter number of users trying to book: "); scanf("%d",&n);
+    printf("\nBooking System Started (Seats: %d)\n\n", SEATS);
+    pthread_mutex_init(&lock, NULL);
+    pthread_t t[n]; int id[n];
+    for(int i=0;i<n;i++){id[i]=i+1; pthread_create(&t[i],NULL,book_seat,&id[i]);}
+    for(int i=0;i<n;i++) pthread_join(t[i],NULL);
+    pthread_mutex_destroy(&lock);
+    printf("\nFinal Seat Status:\n");
+    for(int i=0;i<SEATS;i++)
+        printf("  Seat %d: %s\n",i+1,seats[i]==0?"Free":"Booked");
+    return 0;
+}
+// Compile: gcc ticket.c -lpthread -o ticket`},
+
+  fd:{title:"Food Delivery — Producer-Consumer",
+    algo:[
+      "Customers (producers) place orders in shared bounded buffer. Kitchen (consumer) processes them one by one.",
+      "empty=N (customer waits if full), full=0 (kitchen waits if empty), mutex=1 (buffer protection).",
+      "Customer: sem_wait(empty) → sem_wait(mutex) → place order → sem_post(mutex) → sem_post(full).",
+      "Kitchen: sem_wait(full) → sem_wait(mutex) → fetch order → sem_post(mutex) → sem_post(empty).",
+      "Circular buffer with in/out indexes and modulo N for wrap-around."
+    ],
+    code:`#include<stdio.h>
+#include<pthread.h>
+#include<semaphore.h>
+#define N 3
+
+int orders[N], in=0, out=0, total;
+sem_t empty, full, mutex;
+
+void* customer(void* a){
+    int id = *(int*)a;
+    sem_wait(&empty);
+    sem_wait(&mutex);
+    orders[in] = id;
+    printf("[Customer %d] Order placed in slot %d\n", id, in);
+    in = (in+1) % N;
+    sem_post(&mutex);
+    sem_post(&full);
+    return NULL;
+}
+
+void* kitchen(void* a){
+    for(int i=0; i<total; i++){
+        sem_wait(&full);
+        sem_wait(&mutex);
+        int cid = orders[out];
+        printf("[Kitchen]   Processing order from Customer %d\n", cid);
+        out = (out+1) % N;
+        sem_post(&mutex);
+        sem_post(&empty);
+    }
+    printf("[Kitchen]   All orders done!\n");
+    return NULL;
+}
+
+int main(){
+    printf("Enter number of customers: "); scanf("%d",&total);
+    printf("\nFood Delivery System (Buffer size=%d)\n\n", N);
+    sem_init(&empty, 0, N);
+    sem_init(&full,  0, 0);
+    sem_init(&mutex, 0, 1);
+    pthread_t c[total], k;
+    int id[total];
+    for(int i=0;i<total;i++){id[i]=i+1;pthread_create(&c[i],NULL,customer,&id[i]);}
+    pthread_create(&k, NULL, kitchen, NULL);
+    for(int i=0;i<total;i++) pthread_join(c[i],NULL);
+    pthread_join(k, NULL);
+    return 0;
+}
+// Compile: gcc food.c -lpthread -o food`},
+
+  ts:{title:"Traffic Signal — Semaphore",
+    algo:[
+      "4-way intersection: vehicles from N/S/E/W compete. Only one direction can get green at a time.",
+      "Each direction = a thread. All compete for single semaphore (road=1) representing intersection.",
+      "sem_wait(road) → GREEN → vehicles cross → sem_post(road). Others wait at RED.",
+      "Semaphore enforces mutual exclusion: exactly one thread in critical section (intersection) at a time.",
+      "Real systems use monitors + condition variables for priority control (emergency vehicles, density)."
+    ],
+    code:`#include<stdio.h>
+#include<pthread.h>
+#include<semaphore.h>
+#include<unistd.h>
+
+sem_t road;
+char* dir[] = {"North","South","East","West"};
+
+void* traffic(void* a){
+    int i = *(int*)a;
+    printf("[%s] Waiting at RED signal...\n", dir[i]);
+    sem_wait(&road);
+    printf("[%s] GREEN -> Vehicles passing through!\n", dir[i]);
+    sleep(1);
+    printf("[%s] RED   -> Done crossing\n", dir[i]);
+    sem_post(&road);
+    return NULL;
+}
+
+int main(){
+    printf("Smart Traffic Signal (4-way Intersection)\n");
+    printf("Only 1 direction gets GREEN at a time\n\n");
+    sem_init(&road, 0, 1);
+    pthread_t t[4]; int id[4]={0,1,2,3};
+    for(int i=0;i<4;i++) pthread_create(&t[i],NULL,traffic,&id[i]);
+    for(int i=0;i<4;i++) pthread_join(t[i],NULL);
+    printf("\nAll directions cleared.\n");
+    return 0;
+}
+// Compile: gcc traffic.c -lpthread -o traffic`}
+}},
+
+exp5:{title:"Exp 5: Memory Allocation",subs:{
+  ff:{title:"First Fit",
+    algo:[
+      "Scan from beginning, allocate first block >= process size. Simple and fast. May leave small fragments at start.",
+      "For each process: scan j=0 to nb. If block[j] >= process[i]: alloc[i]=j+1, block[j]-=process[i], break.",
+      "External fragmentation: small unusable pieces accumulate. Compaction can fix but is expensive.",
+      "If no block fits: alloc[i] = -1 (Not Allocated).",
+      "First Fit is faster than Best/Worst Fit. Keeps large blocks at end for big future requests."
+    ],
+    code:`#include<stdio.h>
+
+int main(){
+    int nb, np;
+    printf("Enter number of memory blocks   : "); scanf("%d",&nb);
+    printf("Enter number of processes       : "); scanf("%d",&np);
+
+    int bk[nb], ps[np], alloc[np];
+    printf("\nEnter block sizes (KB):\n");
+    for(int i=0;i<nb;i++){printf("  Block %d : ",i+1); scanf("%d",&bk[i]);}
+    printf("Enter process sizes (KB):\n");
+    for(int i=0;i<np;i++){printf("  Process P%d : ",i+1); scanf("%d",&ps[i]); alloc[i]=-1;}
+
+    for(int i=0;i<np;i++)
+        for(int j=0;j<nb;j++)
+            if(bk[j] >= ps[i]){
+                alloc[i] = j+1;
+                bk[j] -= ps[i];
+                break;
+            }
+
+    printf("\n%-10s %-12s %-15s\n","Process","Size(KB)","Allocated Block");
+    printf("--------------------------------------\n");
+    for(int i=0;i<np;i++){
+        printf("P%-9d %-12d ", i+1, ps[i]);
+        if(alloc[i]==-1) printf("Not Allocated\n");
+        else             printf("Block %d\n", alloc[i]);
+    }
+    printf("\nRemaining block sizes:\n");
+    for(int i=0;i<nb;i++) printf("  Block %d: %d KB\n",i+1,bk[i]);
+    return 0;
+}`},
+
+  bf:{title:"Best Fit",
+    algo:[
+      "For each process, scan ALL blocks. Pick block with smallest size >= process size. Minimizes wasted space.",
+      "best=-1. For each j: if bk[j]>=ps[i] && (best==-1 || bk[j]<bk[best]) → best=j. Cannot break early.",
+      "Creates tiny leftover fragments (near-zero) that are often unusable — paradoxically wastes more total space.",
+      "Time complexity O(n×m) — slower than First Fit's average O(n×m/2).",
+      "Use when memory is limited and waste must be minimal. Avoid when speed is critical."
+    ],
+    code:`#include<stdio.h>
+
+int main(){
+    int nb, np;
+    printf("Enter number of memory blocks   : "); scanf("%d",&nb);
+    printf("Enter number of processes       : "); scanf("%d",&np);
+
+    int bk[nb], ps[np], alloc[np];
+    printf("\nEnter block sizes (KB):\n");
+    for(int i=0;i<nb;i++){printf("  Block %d : ",i+1); scanf("%d",&bk[i]);}
+    printf("Enter process sizes (KB):\n");
+    for(int i=0;i<np;i++){printf("  Process P%d : ",i+1); scanf("%d",&ps[i]); alloc[i]=-1;}
+
+    for(int i=0;i<np;i++){
+        int best = -1;
+        for(int j=0;j<nb;j++)
+            if(bk[j]>=ps[i] && (best==-1 || bk[j]<bk[best]))
+                best = j;
+        if(best != -1){
+            alloc[i] = best+1;
+            bk[best] -= ps[i];
+        }
+    }
+
+    printf("\n%-10s %-12s %-15s\n","Process","Size(KB)","Allocated Block");
+    printf("--------------------------------------\n");
+    for(int i=0;i<np;i++){
+        printf("P%-9d %-12d ", i+1, ps[i]);
+        if(alloc[i]==-1) printf("Not Allocated\n");
+        else             printf("Block %d\n", alloc[i]);
+    }
+    printf("\nRemaining block sizes:\n");
+    for(int i=0;i<nb;i++) printf("  Block %d: %d KB\n",i+1,bk[i]);
+    return 0;
+}`},
+
+  wf:{title:"Worst Fit",
+    algo:[
+      "For each process, pick block with LARGEST size >= process size. Maximizes leftover size.",
+      "worst=-1. For each j: if bk[j]>=ps[i] && (worst==-1 || bk[j]>bk[worst]) → worst=j. Must scan all.",
+      "Rationale: large leftover (e.g. 80KB) is more useful than small leftover (e.g. 2KB) for future requests.",
+      "Performs worst overall — fragments large blocks that could serve big processes.",
+      "Summary: First Fit=fast, Best Fit=min waste, Worst Fit=max leftover. Know which scans all vs stops early."
+    ],
+    code:`#include<stdio.h>
+
+int main(){
+    int nb, np;
+    printf("Enter number of memory blocks   : "); scanf("%d",&nb);
+    printf("Enter number of processes       : "); scanf("%d",&np);
+
+    int bk[nb], ps[np], alloc[np];
+    printf("\nEnter block sizes (KB):\n");
+    for(int i=0;i<nb;i++){printf("  Block %d : ",i+1); scanf("%d",&bk[i]);}
+    printf("Enter process sizes (KB):\n");
+    for(int i=0;i<np;i++){printf("  Process P%d : ",i+1); scanf("%d",&ps[i]); alloc[i]=-1;}
+
+    for(int i=0;i<np;i++){
+        int worst = -1;
+        for(int j=0;j<nb;j++)
+            if(bk[j]>=ps[i] && (worst==-1 || bk[j]>bk[worst]))
+                worst = j;
+        if(worst != -1){
+            alloc[i] = worst+1;
+            bk[worst] -= ps[i];
+        }
+    }
+
+    printf("\n%-10s %-12s %-15s\n","Process","Size(KB)","Allocated Block");
+    printf("--------------------------------------\n");
+    for(int i=0;i<np;i++){
+        printf("P%-9d %-12d ", i+1, ps[i]);
+        if(alloc[i]==-1) printf("Not Allocated\n");
+        else             printf("Block %d\n", alloc[i]);
+    }
+    printf("\nRemaining block sizes:\n");
+    for(int i=0;i<nb;i++) printf("  Block %d: %d KB\n",i+1,bk[i]);
+    return 0;
+}`}
+}},
+
+exp6:{title:"Exp 6: Page Replacement",subs:{
+  fifo:{title:"FIFO",
+    algo:[
+      "Page fault occurs when process accesses page not in physical memory (frames). OS loads it from disk.",
+      "FIFO: replace page loaded earliest (front of queue). Load new page at back. Simple but may increase faults.",
+      "Belady's Anomaly: more frames can sometimes INCREASE faults in FIFO. Unique to FIFO, not LRU/Optimal.",
+      "Implementation: frame[front%f] = new_page; front++. Circular array simulates queue.",
+      "For each reference: check all frames for hit. Miss → fault++, load page, replace oldest if full."
+    ],
+    code:`#include<stdio.h>
+
+int main(){
+    int n, f;
+    printf("Enter number of page references : "); scanf("%d",&n);
+    printf("Enter number of frames          : "); scanf("%d",&f);
+
+    int pg[n];
+    printf("Enter page reference string     : ");
+    for(int i=0;i<n;i++) scanf("%d",&pg[i]);
+
+    int frame[f], front=0, faults=0;
+    for(int i=0;i<f;i++) frame[i]=-1;
+
+    printf("\nRef\tFrames\t\t\t\tStatus\n");
+    printf("---\t------\t\t\t\t------\n");
+    for(int i=0;i<n;i++){
+        int hit=0;
+        for(int j=0;j<f;j++)
+            if(frame[j]==pg[i]){hit=1; break;}
+
+        if(!hit){
+            frame[front%f] = pg[i];
+            front++;
+            faults++;
+        }
+
+        printf("%2d\t", pg[i]);
+        for(int j=0;j<f;j++)
+            printf(frame[j]==-1?"[_] ":"[%d] ",frame[j]);
+        printf("\t%s\n", hit?"HIT":"PAGE FAULT");
+    }
+    printf("\n==> Total Page Faults: %d\n", faults);
+    return 0;
+}`},
+
+  lru:{title:"LRU",
+    algo:[
+      "LRU replaces page accessed longest time ago. Based on temporal locality — recently used pages likely reused.",
+      "age[f] tracks last-used time. On HIT: age[hit_frame]=i. On MISS: replace frame with smallest age value.",
+      "Find LRU victim: scan frames, find j with minimum age[j]. Replace frame[lru]=new_page, age[lru]=i.",
+      "Hit case: just update age[hit_index]=i. No replacement needed.",
+      "LRU is better than FIFO (no Belady's anomaly). Close to Optimal. Needs hardware support in real OS."
+    ],
+    code:`#include<stdio.h>
+
+int main(){
+    int n, f;
+    printf("Enter number of page references : "); scanf("%d",&n);
+    printf("Enter number of frames          : "); scanf("%d",&f);
+
+    int pg[n];
+    printf("Enter page reference string     : ");
+    for(int i=0;i<n;i++) scanf("%d",&pg[i]);
+
+    int frame[f], age[f], faults=0;
+    for(int i=0;i<f;i++){frame[i]=-1; age[i]=0;}
+
+    printf("\nRef\tFrames\t\t\t\tStatus\n");
+    printf("---\t------\t\t\t\t------\n");
+    for(int i=0;i<n;i++){
+        int hit=-1;
+        for(int j=0;j<f;j++)
+            if(frame[j]==pg[i]){hit=j; break;}
+
+        if(hit != -1){
+            age[hit] = i;
+        } else {
+            int lru=0;
+            for(int j=1;j<f;j++)
+                if(age[j] < age[lru]) lru=j;
+            frame[lru] = pg[i];
+            age[lru]   = i;
+            faults++;
+        }
+
+        printf("%2d\t", pg[i]);
+        for(int j=0;j<f;j++)
+            printf(frame[j]==-1?"[_] ":"[%d] ",frame[j]);
+        printf("\t%s\n", hit!=-1?"HIT":"PAGE FAULT");
+    }
+    printf("\n==> Total Page Faults: %d\n", faults);
+    return 0;
+}`},
+
+  opt:{title:"Optimal",
+    algo:[
+      "Optimal replaces page that will not be used for the longest time in future. Minimum possible page faults.",
+      "On fault with full frames: for each frame, find its next use in future reference string. Evict farthest.",
+      "Inner loop: for(k=i+1; k<n; k++) if(pg[k]==frame[j]) break. If k reaches n, page never used again.",
+      "Check for empty frames first (frame[j]==-1). Fill those before any eviction.",
+      "Purely theoretical — needs future knowledge. Used as benchmark to compare FIFO and LRU."
+    ],
+    code:`#include<stdio.h>
+
+int main(){
+    int n, f;
+    printf("Enter number of page references : "); scanf("%d",&n);
+    printf("Enter number of frames          : "); scanf("%d",&f);
+
+    int pg[n];
+    printf("Enter page reference string     : ");
+    for(int i=0;i<n;i++) scanf("%d",&pg[i]);
+
+    int frame[f], faults=0;
+    for(int i=0;i<f;i++) frame[i]=-1;
+
+    printf("\nRef\tFrames\t\t\t\tStatus\n");
+    printf("---\t------\t\t\t\t------\n");
+    for(int i=0;i<n;i++){
+        int hit=0;
+        for(int j=0;j<f;j++) if(frame[j]==pg[i]){hit=1;break;}
+
+        if(!hit){
+            int empty=-1;
+            for(int j=0;j<f;j++) if(frame[j]==-1){empty=j;break;}
+
+            if(empty != -1){
+                frame[empty] = pg[i];
+            } else {
+                int far=0, idx=0;
+                for(int j=0;j<f;j++){
+                    int k;
+                    for(k=i+1; k<n; k++)
+                        if(pg[k]==frame[j]) break;
+                    if(k > far){far=k; idx=j;}
+                }
+                frame[idx] = pg[i];
+            }
+            faults++;
+        }
+
+        printf("%2d\t", pg[i]);
+        for(int j=0;j<f;j++)
+            printf(frame[j]==-1?"[_] ":"[%d] ",frame[j]);
+        printf("\t%s\n", hit?"HIT":"PAGE FAULT");
+    }
+    printf("\n==> Total Page Faults: %d\n", faults);
+    return 0;
+}`}
+}}};
+
+const nav = document.getElementById('nav');
+const main = document.getElementById('main');
+
+function render(expKey, subKey){
+    const exp = data[expKey];
+    const sub = exp.subs[subKey];
+
+    document.querySelectorAll('.exp-header').forEach(e => e.classList.toggle('active', e.dataset.exp === expKey));
+    document.querySelectorAll('.sub-item').forEach(e => e.classList.toggle('active', e.dataset.sub === subKey && e.dataset.exp === expKey));
+
+    const algoHTML = sub.algo.map((s, i) => `
+        <li>
+            <div class="step-num">${i+1}</div>
+            <div>${s}</div>
+        </li>`).join('');
+
+    const uid = expKey + '_' + subKey;
+
+    main.innerHTML = `
+    <div class="page-title">${sub.title}</div>
+    <div class="page-sub">${exp.title}</div>
+    <div class="tabs">
+        <div class="tab active" onclick="showTab(this,'algo-sec')">Algorithm</div>
+        <div class="tab" onclick="showTab(this,'code-sec')">C Code</div>
+    </div>
+    <div id="algo-sec" class="card">
+        <div class="card-header">
+            <span class="badge-algo">ALGORITHM</span>
+            <span style="font-size:12px;color:#888">Exam-ready steps</span>
+        </div>
+        <div class="card-body">
+            <ul class="algo-list">${algoHTML}</ul>
+        </div>
+    </div>
+    <div id="code-sec" class="card hidden">
+        <div class="card-header">
+            <span class="badge-code">C CODE</span>
+            <span style="font-size:12px;color:#888">gcc file.c -lpthread -o out</span>
+            <button class="copy-btn" id="cbtn-${uid}" onclick="copyCode('${uid}')">Copy</button>
+        </div>
+        <div class="card-body">
+            <pre id="code-${uid}">${escHtml(sub.code)}</pre>
+        </div>
+    </div>`;
+}
+
+function escHtml(s){
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function copyCode(uid){
+    const el = document.getElementById('code-' + uid);
+    const btn = document.getElementById('cbtn-' + uid);
+    // Get raw text — no HTML tags
+    const text = el.textContent || el.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+    }).catch(() => {
+        // Fallback for browsers that block clipboard
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+    });
+}
+
+function showTab(el, sec){
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    ['algo-sec','code-sec'].forEach(id => {
+        const div = document.getElementById(id);
+        if(div) div.classList.toggle('hidden', id !== sec);
+    });
+}
+
+const expLabels = {
+    exp1:'Exp 1: System Calls', exp2:'Exp 2: CPU Scheduling',
+    exp3:'Exp 3: Classical Problems', exp4:'Exp 4: Sync Problems',
+    exp5:'Exp 5: Memory Allocation', exp6:'Exp 6: Page Replacement'
+};
+const subLabels = {
+    exp1:{pf:'getpid/getppid/fork', dir:'opendir/readdir/closedir', rw:'open/read/write/close'},
+    exp2:{fcfs:'FCFS', rr:'Round Robin', sjf:'SJF Non-Preemptive', pri:'Priority Scheduling'},
+    exp3:{bb:'Bounded Buffer', rw:'Reader-Writer', dp:'Dining Philosophers', dlf:'Deadlock-Free (Tanenbaum)'},
+    exp4:{tk:'Ticket Booking', fd:'Food Delivery', ts:'Traffic Signal'},
+    exp5:{ff:'First Fit', bf:'Best Fit', wf:'Worst Fit'},
+    exp6:{fifo:'FIFO', lru:'LRU', opt:'Optimal'}
+};
+
+Object.keys(data).forEach(expKey => {
+    const g = document.createElement('div');
+    g.className = 'exp-group';
+    const h = document.createElement('div');
+    h.className = 'exp-header';
+    h.dataset.exp = expKey;
+    h.textContent = expLabels[expKey];
+    h.onclick = () => { const first = Object.keys(data[expKey].subs)[0]; render(expKey, first); };
+    g.appendChild(h);
+    Object.keys(data[expKey].subs).forEach(sk => {
+        const s = document.createElement('div');
+        s.className = 'sub-item';
+        s.dataset.exp = expKey;
+        s.dataset.sub = sk;
+        s.textContent = subLabels[expKey][sk] || sk;
+        s.onclick = (e) => { e.stopPropagation(); render(expKey, sk); };
+        g.appendChild(s);
+    });
+    nav.appendChild(g);
+});
+
+render('exp1','pf');
+</script>
+</body>
+</html>
